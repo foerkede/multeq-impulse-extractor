@@ -17,6 +17,7 @@ perfect_speaker_file = os.path.join(script_dir, 'perfect_speaker.json')
 @dataclasses.dataclass
 class Config:
     default: bool
+    mid: bool
     clean: bool
     filter: pathlib.Path
     extract: bool
@@ -43,6 +44,8 @@ class multeqTool:
             self.extract(in_file_wo_ext, in_json)
         if self.config.default:
             in_json = self.default(in_json)
+        if self.config.mid:
+            in_json = self.mid_comp(in_json)
         if self.config.clean:
             in_json = self.clean_response(in_json)
         if self.config.filter:
@@ -87,7 +90,19 @@ class multeqTool:
             in_json['detectedChannels'][i]['customLevel'] = '0'
             in_json['detectedChannels'][i]['customCrossover'] = 'F'
             in_json['detectedChannels'][i]['customSpeakerType'] = 'L'
-            in_json['detectedChannels'][i]['midrangeCompensation'] = 'false'
+            in_json['detectedChannels'][i]['midrangeCompensation'] = False
+        
+        print("done")
+
+        return in_json
+
+    def mid_comp(self, in_json):
+        print("turning off midrange compensation...", end = "")
+
+        detected_channel_count = len(in_json['detectedChannels'])
+
+        for i in range(0, detected_channel_count):
+            in_json['detectedChannels'][i]['midrangeCompensation'] = False
         
         print("done")
 
@@ -157,6 +172,11 @@ def main():
         action='store_true',
     )
     parser.add_argument(
+        '-m', '--mid',
+        help='Turn midrange compensation off',
+        action='store_true',
+    )
+    parser.add_argument(
         '-c', '--clean',
         help='Output a file with cleaned response data',
         action='store_true',
@@ -174,6 +194,7 @@ def main():
     args = parser.parse_args()
     args_dataclass = Config(
         default=args.default,
+        mid=args.mid,
         clean=args.clean,
         filter=args.filter,
         extract=args.extract,
