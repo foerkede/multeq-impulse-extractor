@@ -8,6 +8,8 @@
 # Setuptools distribution folder.
 /dist/
 /build/
+/venv
+.idea
 
 # Python egg metadata, regenerated from source files by setuptools.
 /*.egg-info

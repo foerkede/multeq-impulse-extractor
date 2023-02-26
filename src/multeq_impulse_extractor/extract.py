@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import argparse
+import ast
 import pathlib
 import dataclasses
 from array import ArrayType
@@ -21,6 +22,7 @@ class Config:
     clean: bool
     filter: pathlib.Path
     extract: bool
+    distances: pathlib.Path
 
 
 class multeqTool:
@@ -53,12 +55,17 @@ class multeqTool:
                 raise RuntimeError(
                     f'Incorrect path to filter directory: {self.config.filter.absolute()}')
             in_json = self.inject_filters(in_json)
+        if self.config.distances:
+            if not self.config.distances.is_file():
+                raise RuntimeError(
+                    f'Incorrect path to distances file: {self.config.filter.absolute()}')
+            in_json = self.inject_distances(in_json)
 
         # Save our changes to JSON file
         with open(out_file, "w+") as outjsonFile:
             json.dump(in_json, outjsonFile)
             outjsonFile.close()
-            print("output file succefull: " + outjsonFile.name) 
+            print("output file succefull: " + outjsonFile.name)
 
     def extract(self, in_file_wo_ext: str, in_json):
         print("extracting response data...", end = "")
@@ -77,7 +84,7 @@ class multeqTool:
                     fp.write('\n')
                     fp.write('\n'.join(data))
                     fp.close()
-        
+
         print("done")
 
     def default(self, in_json):
@@ -91,7 +98,7 @@ class multeqTool:
             in_json['detectedChannels'][i]['customCrossover'] = 'F'
             in_json['detectedChannels'][i]['customSpeakerType'] = 'L'
             in_json['detectedChannels'][i]['midrangeCompensation'] = False
-        
+
         print("done")
 
         return in_json
@@ -103,7 +110,7 @@ class multeqTool:
 
         for i in range(0, detected_channel_count):
             in_json['detectedChannels'][i]['midrangeCompensation'] = False
-        
+
         print("done")
 
         return in_json
@@ -119,7 +126,7 @@ class multeqTool:
         for i in range(0, detected_channel_count):
             for measurement, data in in_json['detectedChannels'][i]['responseData'].items():
                 in_json['detectedChannels'][i]['responseData'][measurement] = perfect_speaker_data
-        
+
         print("done")
 
         return in_json
@@ -147,11 +154,27 @@ class multeqTool:
                     filter_data.append('{%s, %s}' %
                                        (line_values[0], line_values[1]))
                 in_json['detectedChannels'][i]['customTargetCurvePoints'] = filter_data
-        
+
         print("inject filters done")
 
         return in_json
 
+    def inject_distances(self, in_json):
+        print("inject distances...")
+
+        detected_channel_count = len(in_json['detectedChannels'])
+
+        with open(self.config.distances.name, 'r', encoding="ISO-8859-1") as data:
+            distances = ast.literal_eval(data.read())
+            for i in range(0, detected_channel_count):
+                speaker = in_json['detectedChannels'][i]['commandId']
+                if speaker not in distances.keys():
+                    print("No Value, skipping speaker " + speaker)
+                    continue
+                in_json['detectedChannels'][i]['customDistance'] = distances[speaker]
+
+        print("done")
+        return in_json
 
 def main():
     parser = argparse.ArgumentParser()
@@ -191,6 +214,11 @@ def main():
         help='Decode one channel at a time',
         action='store_true',
     )
+    parser.add_argument(
+        '--distances',
+        help='Set distances according to specified file',
+        type=pathlib.Path
+    )
     args = parser.parse_args()
     args_dataclass = Config(
         default=args.default,
@@ -198,6 +226,7 @@ def main():
         clean=args.clean,
         filter=args.filter,
         extract=args.extract,
+        distances=args.distances,
     )
 
     multeq = multeqTool(args_dataclass)
