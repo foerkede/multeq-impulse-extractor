@@ -1,13 +1,11 @@
 #!/usr/bin/python3
 
 import argparse
-import ast
-import pathlib
 import dataclasses
-from array import ArrayType
 import json
-import sys
 import os
+import pathlib
+import sys
 
 ady_in_file = sys.argv[1]
 script_dir = os.path.dirname(__file__)
@@ -22,7 +20,7 @@ class Config:
     clean: bool
     filter: pathlib.Path
     extract: bool
-    distances: pathlib.Path
+    values: pathlib.Path
 
 
 class multeqTool:
@@ -55,11 +53,11 @@ class multeqTool:
                 raise RuntimeError(
                     f'Incorrect path to filter directory: {self.config.filter.absolute()}')
             in_json = self.inject_filters(in_json)
-        if self.config.distances:
-            if not self.config.distances.is_file():
+        if self.config.values:
+            if not self.config.values.is_file():
                 raise RuntimeError(
                     f'Incorrect path to distances file: {self.config.filter.absolute()}')
-            in_json = self.inject_distances(in_json)
+            in_json = self.inject_values(in_json)
 
         # Save our changes to JSON file
         with open(out_file, "w+") as outjsonFile:
@@ -159,19 +157,23 @@ class multeqTool:
 
         return in_json
 
-    def inject_distances(self, in_json):
-        print("inject distances...")
+    def inject_values(self, in_json):
+        print("inject values...")
 
         detected_channel_count = len(in_json['detectedChannels'])
 
-        with open(self.config.distances.name, 'r', encoding="ISO-8859-1") as data:
-            distances = ast.literal_eval(data.read())
+        with open(self.config.values.name, 'r') as jsonFile:
+            values = json.load(jsonFile)
             for i in range(0, detected_channel_count):
                 speaker = in_json['detectedChannels'][i]['commandId']
-                if speaker not in distances.keys():
-                    print("No Value, skipping speaker " + speaker)
+                if speaker not in values.keys():
+                    print("No Values, skipping speaker " + speaker)
                     continue
-                in_json['detectedChannels'][i]['customDistance'] = distances[speaker]
+                in_json['detectedChannels'][i]['customDistance'] = values[speaker]['distance']
+                in_json['detectedChannels'][i]['customLevel'] = values[speaker]['level']
+                if speaker != "SW1" and speaker != "SW2":
+                    in_json['detectedChannels'][i]['customCrossover'] = values[speaker]['crossover']
+                    in_json['detectedChannels'][i]['customSpeakerType'] = 'S'
 
         print("done")
         return in_json
@@ -215,7 +217,7 @@ def main():
         action='store_true',
     )
     parser.add_argument(
-        '--distances',
+        '-v', '--values',
         help='Set distances according to specified file',
         type=pathlib.Path
     )
@@ -226,7 +228,7 @@ def main():
         clean=args.clean,
         filter=args.filter,
         extract=args.extract,
-        distances=args.distances,
+        values=args.values,
     )
 
     multeq = multeqTool(args_dataclass)
